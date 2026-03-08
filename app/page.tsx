@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { db } from "@/lib/firebase"
+import { collection, getDocs } from "firebase/firestore"
 import {
   Users,
   Clock,
@@ -41,48 +43,16 @@ const funnelSteps = [
   { label: "Registro Completado", value: 634, rate: "13.2%", color: "hsl(var(--chart-5))" },
 ]
 
-const kpiCards = [
-  {
-    title: "Trafico Total",
-    value: "4,820",
-    change: "+18.3%",
-    trend: "up" as const,
-    subtitle: "Presencias detectadas",
-    icon: Users,
-  },
-  {
-    title: "Engagement Rate",
-    value: "45.0%",
-    change: "+3.1%",
-    trend: "up" as const,
-    subtitle: "Sesiones / Presencias",
-    icon: Eye,
-  },
-  {
-    title: "Duracion Promedio",
-    value: "2m 34s",
-    change: "+12s",
-    trend: "up" as const,
-    subtitle: "Tiempo activo por sesion",
-    icon: Clock,
-  },
-  {
-    title: "Tasa de Conversion",
-    value: "13.2%",
-    change: "+1.8%",
-    trend: "up" as const,
-    subtitle: "Registros / Presencias",
-    icon: UserCheck,
-  },
-  {
-    title: "Total Registros",
-    value: "634",
-    change: "+22%",
-    trend: "up" as const,
-    subtitle: "Correos capturados",
-    icon: TrendingUp,
-  },
-]
+const iconMap = {
+  Users,
+  Eye,
+  Clock,
+  UserCheck,
+  TrendingUp,
+  TrendingDown,
+}
+
+// Los KPIs ahora se cargarán desde Firestore
 
 const dailyTrend = [
   { date: "11 Jun", presencias: 420, sesiones: 190, registros: 52 },
@@ -111,8 +81,25 @@ const noSessionData = [
   { hour: "20:00", rate: 60 },
 ]
 
-export default function OverviewPage() {
+export default function Page() {
+
   const [selectedPeriod, setSelectedPeriod] = useState("Ultimos 7 dias")
+  const [kpiCards, setKpiCards] = useState<Array<any>>([])
+
+  useEffect(() => {
+    async function fetchKPIs() {
+      const querySnapshot = await getDocs(collection(db, "kpis"))
+      const kpis = querySnapshot.docs.map(doc => {
+        const data = doc.data()
+        return {
+          ...data,
+          icon: iconMap[data.icon as keyof typeof iconMap] || Users,
+        }
+      })
+      setKpiCards(kpis)
+    }
+    fetchKPIs()
+  }, [])
 
   return (
     <DashboardLayout>
@@ -145,7 +132,7 @@ export default function OverviewPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center">
-                  <kpi.icon className="w-4 h-4 text-muted-foreground" />
+                  {kpi.icon && <kpi.icon className="w-4 h-4 text-muted-foreground" />}
                 </div>
                 <div
                   className={`flex items-center gap-1 text-xs font-medium ${
@@ -303,7 +290,7 @@ export default function OverviewPage() {
                       color: "hsl(var(--foreground))",
                     }}
                     labelStyle={{ color: "hsl(var(--foreground))" }}
-                    formatter={(value: number) => [`${value}%`, "No Session Rate"]}
+                    formatter={(value) => [`${value ?? 0}%`, "No Session Rate"]}
                   />
                   <Bar dataKey="rate" radius={[3, 3, 0, 0]}>
                     {noSessionData.map((entry, index) => (
